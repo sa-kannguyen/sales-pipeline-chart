@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weekly Status Tracking Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-a"></div>
+    <div class="bg-shape bg-shape-b"></div>
+
+    <main class="dashboard">
+      <header class="hero">
+        <p class="eyebrow">FY Pipeline Monitor</p>
+        <h1>Weekly Opportunity Status Tracker</h1>
+        <p class="subtitle">
+          Track weekly status changes across all opportunities, auto-synced from your CSV file updated each week.
+        </p>
+      </header>
+
+      <section class="kpi-grid" id="kpiGrid"></section>
+
+      <section class="panel timeline-panel">
+        <div class="panel-head">
+          <h2>Weekly Pipeline Timeline</h2>
+          <p>
+            A single chart combining all pipeline data: opportunity count by status per week (stacked),
+            overlaid with the Average Stage Score trend line.
+          </p>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="timelineChart" aria-label="Weekly pipeline timeline chart"></canvas>
+        </div>
+      </section>
+
+      <section class="panel legend-panel">
+        <div class="panel-head">
+          <h2>Status Legend</h2>
+          <p>Status code mapping used in this dashboard.</p>
+        </div>
+        <div id="statusLegend" class="legend-grid"></div>
+      </section>
+
+      <section class="panel file-panel">
+        <div class="panel-head">
+          <h2>CSV Source</h2>
+          <p>
+            The dashboard auto-loads from data.csv in the current folder. If opened via file://
+            and the file cannot be loaded, upload it manually below.
+          </p>
+        </div>
+        <div class="file-row">
+          <input type="file" id="csvInput" accept=".csv" />
+          <button id="reloadBtn" type="button">Reload data.csv</button>
+        </div>
+        <p id="statusText" class="status-text"></p>
+      </section>
+    </main>
+
+    <!-- Deal Modal -->
+    <div id="dealModal" class="modal-backdrop" hidden>
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="modal-eyebrow" id="modalWeek"></p>
+            <h2 id="modalTitle"></h2>
+          </div>
+          <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <table class="deal-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>No.</th>
+                <th>Client</th>
+                <th>Project Name</th>
+                <th>Total Contract</th>
+              </tr>
+            </thead>
+            <tbody id="modalTableBody"></tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <span id="modalCount"></span>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
