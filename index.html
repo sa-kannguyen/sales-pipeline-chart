@@ -71,13 +71,13 @@
       <section class="panel kpi-tracker-panel" id="kpiTrackerPanel" hidden>
         <div class="panel-head">
           <h2>Sales KPI Tracker</h2>
-          <p>Weekly actual vs. target for the 3 core KPI metrics. Target: 2 アポ獲得 / 3 顧客訪問 / 1 案件獲得 per week.</p>
+          <p>Weekly merged KPI status (アポ獲得数 / 顧客訪問数 / 案件獲得件数). Green means all targets passed, red means at least one target missed.</p>
         </div>
         <div class="kpi-tracker-summary" id="kpiTrackerSummary"></div>
         <div class="chart-wrap kpi-chart-wrap">
           <canvas id="kpiChart" aria-label="Sales KPI tracker chart"></canvas>
         </div>
-        <div class="kpi-progress-table-wrap">
+        <div class="kpi-progress-table-wrap" hidden>
           <table class="kpi-progress-table" id="kpiProgressTable"></table>
         </div>
       </section>

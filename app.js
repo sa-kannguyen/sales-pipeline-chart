@@ -538,94 +538,32 @@ function buildKpiChart(weeklyData) {
 
   const kpiWeekly = calcKpiWeekly(weeklyData);
   const labels = kpiWeekly.map((w) => w.week);
-  let maxCumRateValue = 100;
+  const weeklyStatus = kpiWeekly.map((week) => {
+    const metCount = KPI_DEFS.reduce((count, kpi) => {
+      return count + (week[kpi.key].actual >= kpi.target ? 1 : 0);
+    }, 0);
+    return {
+      passed: metCount === KPI_DEFS.length,
+      metCount
+    };
+  });
 
-  const datasets = [];
-
-  KPI_DEFS.forEach((kpi) => {
-    datasets.push({
+  const datasets = [
+    {
       type: "bar",
-      label: `${kpi.label} 実績`,
-      kpiKey: kpi.key,
-      target: kpi.target,
-      data: kpiWeekly.map((w) => w[kpi.key].actual),
-      backgroundColor: kpi.color,
+      label: "週次KPI判定",
+      data: weeklyStatus.map(() => 1),
+      backgroundColor: weeklyStatus.map((s) => (s.passed ? "#86efac" : "#ef4444")),
+      hoverBackgroundColor: weeklyStatus.map((s) => (s.passed ? "#4ade80" : "#dc2626")),
       borderRadius: 4,
+      borderSkipped: false,
       borderWidth: 0,
-      categoryPercentage: 1.0,
-      barPercentage: 1.0,
-      maxBarThickness: 72,
-      datalabels: {
-        labels: {
-          value: {
-            display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
-            formatter: (v) => `${v}/${kpi.target}`,
-            color: "#fff",
-            font: { size: 10, weight: "700" },
-            anchor: "center",
-            align: "center",
-            clip: true
-          },
-          status: {
-            display: true,
-            formatter: (v) => (v >= kpi.target ? "達成" : "未達"),
-            color: (ctx) => (ctx.dataset.data[ctx.dataIndex] >= kpi.target ? "#166534" : "#991b1b"),
-            backgroundColor: (ctx) => (ctx.dataset.data[ctx.dataIndex] >= kpi.target ? "rgba(220,252,231,0.95)" : "rgba(254,226,226,0.95)"),
-            borderColor: (ctx) => (ctx.dataset.data[ctx.dataIndex] >= kpi.target ? "rgba(34,197,94,0.55)" : "rgba(239,68,68,0.45)"),
-            borderWidth: 1,
-            borderRadius: 999,
-            padding: { top: 3, bottom: 3, left: 6, right: 6 },
-            font: { size: 9, weight: "700" },
-            anchor: "end",
-            align: "top",
-            offset: 6,
-            clamp: true,
-            clip: false
-          }
-        }
-      }
-    });
-  });
-
-  KPI_DEFS.forEach((kpi) => {
-    let cumActual = 0;
-    let cumTarget = 0;
-    const cumRates = kpiWeekly.map((w) => {
-      cumActual += w[kpi.key].actual;
-      cumTarget += kpi.target;
-      return cumTarget > 0 ? Math.round((cumActual / cumTarget) * 100) : null;
-    });
-    const localMax = cumRates.reduce((m, v) => (v !== null && v > m ? v : m), 0);
-    if (localMax > maxCumRateValue) maxCumRateValue = localMax;
-
-    const lineColor = kpi.lineColor || kpi.color;
-    datasets.push({
-      type: "line",
-      label: `${kpi.label} 累積進捗率`,
-      data: cumRates,
-      yAxisID: "yRate",
-      borderColor: lineColor,
-      backgroundColor: "transparent",
-      pointRadius: 4,
-      pointHoverRadius: 6,
-      borderWidth: 2,
-      borderDash: [5, 3],
-      tension: 0.3,
-      spanGaps: true,
-      datalabels: {
-        display: true,
-        formatter: (v) => (v !== null ? `${v}%` : ""),
-        color: lineColor,
-        font: { size: 9, weight: "700" },
-        align: "top",
-        anchor: "end",
-        offset: 2,
-        backgroundColor: "rgba(255,255,255,0.85)",
-        borderRadius: 3,
-        padding: { top: 1, bottom: 1, left: 3, right: 3 }
-      }
-    });
-  });
+      categoryPercentage: 0.9,
+      barPercentage: 0.9,
+      maxBarThickness: 24,
+      datalabels: { display: false }
+    }
+  ];
 
   const kpiCanvas = document.getElementById("kpiChart");
   setCanvasWidth(kpiCanvas, labels.length);
@@ -643,36 +581,36 @@ function buildKpiChart(weeklyData) {
         },
         tooltip: {
           callbacks: {
+            title: (items) => {
+              const week = items?.[0]?.label || "";
+              return `Week ${week}`;
+            },
             label: (item) => {
-              if (item.dataset.yAxisID === "yRate") {
-                return `${item.dataset.label}: ${item.formattedValue}%`;
-              }
-              const target = item.dataset.target;
-              const actual = Number(item.raw || 0);
-              const rate = target > 0 ? Math.round((actual / target) * 100) : 0;
-              const diff = actual - target;
-              const sign = diff > 0 ? "+" : "";
-              const status = actual >= target ? "達成" : "未達";
-              return `${item.dataset.label}: 実績 ${actual} / 計画 ${target} (${sign}${diff}, ${rate}%, ${status})`;
+              const status = weeklyStatus[item.dataIndex];
+              return `総合判定: ${status.passed ? "達成" : "未達"} (${status.metCount}/${KPI_DEFS.length})`;
+            },
+            afterLabel: (item) => {
+              const week = kpiWeekly[item.dataIndex];
+              return KPI_DEFS.map((kpi) => {
+                const actual = week[kpi.key].actual;
+                const pass = actual >= kpi.target ? "達成" : "未達";
+                return `${kpi.label}: ${actual}/${kpi.target} ${pass}`;
+              });
             }
           }
         }
       },
       scales: {
-        x: { ticks: { maxRotation: 0, autoSkip: true } },
+        x: {
+          ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 16 },
+          grid: { display: false }
+        },
         y: {
           beginAtZero: true,
-          grace: "18%",
-          ticks: { precision: 0 },
-          title: { display: true, text: "Count" }
-        },
-        yRate: {
-          position: "right",
-          beginAtZero: true,
-          max: Math.max(150, Math.ceil((maxCumRateValue + 10) / 10) * 10),
-          ticks: { callback: (v) => `${v}%` },
-          grid: { drawOnChartArea: false },
-          title: { display: true, text: "累積進捗率" }
+          max: 1,
+          ticks: { stepSize: 1, callback: () => "" },
+          grid: { display: false },
+          border: { display: false }
         }
       }
     }
