@@ -59,6 +59,36 @@ function getReadableTextColor(hexColor) {
   return luminance > 0.62 ? "#1f2937" : "#ffffff";
 }
 
+function setCanvasWidth(canvasElement, dataPointCount) {
+  try {
+    if (!canvasElement || !dataPointCount || dataPointCount < 1) return;
+    
+    const container = canvasElement.parentElement;
+    if (!container) return;
+    
+    // Get container width
+    let containerWidth = container.clientWidth;
+    if (containerWidth <= 0) {
+      containerWidth = Math.min(window.innerWidth - 80, 1168); // Account for padding
+    }
+    
+    // Calculate needed width: ~60px per data point
+    const minWidthPerPoint = 60;
+    const calculatedWidth = dataPointCount * minWidthPerPoint;
+    
+    // Set canvas width to expand for scrolling if needed, but respect container bounds
+    if (calculatedWidth > containerWidth) {
+      // Canvas needs to expand - set explicit width for scrolling
+      canvasElement.style.width = calculatedWidth + "px";
+    } else {
+      // Canvas fits in container - use container width
+      canvasElement.style.width = "100%";
+    }
+  } catch (err) {
+    console.error("Error in setCanvasWidth:", err);
+  }
+}
+
 function hexToRgba(hex, alpha) {
   const clean = String(hex || "").replace("#", "").trim();
   if (clean.length !== 6) return `rgba(148, 163, 184, ${alpha})`;
@@ -235,11 +265,24 @@ function setupSearchableDropdown() {
   }
 }
 
-const kpiGrid = document.getElementById("kpiGrid");
-const statusLegend = document.getElementById("statusLegend");
-const statusText = document.getElementById("statusText");
-const csvInput = document.getElementById("csvInput");
-const reloadBtn = document.getElementById("reloadBtn");
+// Defer DOM queries until elements are available
+let kpiGrid;
+let statusLegend;
+let statusText;
+let csvInput;
+let reloadBtn;
+
+function initializeDOMElements() {
+  kpiGrid = document.getElementById("kpiGrid");
+  statusLegend = document.getElementById("statusLegend");
+  statusText = document.getElementById("statusText");
+  csvInput = document.getElementById("csvInput");
+  reloadBtn = document.getElementById("reloadBtn");
+  
+  if (!kpiGrid || !statusLegend || !statusText || !csvInput || !reloadBtn) {
+    console.error("Some required DOM elements not found");
+  }
+}
 
 function cleanText(value) {
   return String(value ?? "")
@@ -472,9 +515,9 @@ Chart.register(ChartDataLabels);
 
 // ─── Sales KPI Tracker ─────────────────────────────────────────────────────
 const KPI_DEFS = [
-  { key: "apo",   label: "アポ獲得数",   codes: ["01"],     target: 2, color: "#3a86ff" },
-  { key: "visit", label: "顧客訪問数",   codes: ["02"],     target: 3, color: "#06d6a0" },
-  { key: "won",   label: "案件獲得件数", codes: ["6", "7"], target: 4, color: "#2a9d8f" },
+  { key: "apo",   label: "アポ獲得数",   codes: ["01"],     target: 2, color: "#3a86ff", failColor: "#ef4444" },
+  { key: "visit", label: "顧客訪問数",   codes: ["02"],     target: 3, color: "#8b5cf6" },
+  { key: "won",   label: "案件獲得件数", codes: ["6", "7"], target: 1, color: "#f97316", lineColor: "#ea580c", failColor: "#b91c1c" },
 ];
 
 let kpiChartInstance = null;
@@ -500,50 +543,53 @@ function buildKpiChart(weeklyData) {
   const datasets = [];
 
   KPI_DEFS.forEach((kpi) => {
-    // Target bar (muted)
-    datasets.push({
-      type: "bar",
-      label: `${kpi.label} 計画`,
-      data: kpiWeekly.map(() => kpi.target),
-      backgroundColor: `${kpi.color}30`,
-      borderColor: `${kpi.color}80`,
-      borderWidth: 1,
-      borderRadius: 4,
-      stack: `${kpi.key}-plan`,
-      categoryPercentage: 0.72,
-      barPercentage: 0.9,
-      maxBarThickness: 18,
-      datalabels: { display: false }
-    });
-    // Actual bar
     datasets.push({
       type: "bar",
       label: `${kpi.label} 実績`,
+      kpiKey: kpi.key,
+      target: kpi.target,
       data: kpiWeekly.map((w) => w[kpi.key].actual),
-      backgroundColor: kpiWeekly.map((w) =>
-        w[kpi.key].actual >= kpi.target ? kpi.color : "#e63946"
-      ),
+      backgroundColor: kpi.color,
       borderRadius: 4,
       borderWidth: 0,
-      stack: `${kpi.key}-actual`,
-      categoryPercentage: 0.72,
-      barPercentage: 0.9,
-      maxBarThickness: 18,
+      categoryPercentage: 1.0,
+      barPercentage: 1.0,
+      maxBarThickness: 72,
       datalabels: {
-        display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
-        formatter: (v) => v,
-        color: "#fff",
-        font: { size: 10, weight: "700" },
-        anchor: "center",
-        align: "center",
-        clip: true
+        labels: {
+          value: {
+            display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+            formatter: (v) => `${v}/${kpi.target}`,
+            color: "#fff",
+            font: { size: 10, weight: "700" },
+            anchor: "center",
+            align: "center",
+            clip: true
+          },
+          status: {
+            display: true,
+            formatter: (v) => (v >= kpi.target ? "達成" : "未達"),
+            color: (ctx) => (ctx.dataset.data[ctx.dataIndex] >= kpi.target ? "#166534" : "#991b1b"),
+            backgroundColor: (ctx) => (ctx.dataset.data[ctx.dataIndex] >= kpi.target ? "rgba(220,252,231,0.95)" : "rgba(254,226,226,0.95)"),
+            borderColor: (ctx) => (ctx.dataset.data[ctx.dataIndex] >= kpi.target ? "rgba(34,197,94,0.55)" : "rgba(239,68,68,0.45)"),
+            borderWidth: 1,
+            borderRadius: 999,
+            padding: { top: 3, bottom: 3, left: 6, right: 6 },
+            font: { size: 9, weight: "700" },
+            anchor: "end",
+            align: "top",
+            offset: 6,
+            clamp: true,
+            clip: false
+          }
+        }
       }
     });
   });
 
-  // 累積進捗率 lines per KPI
   KPI_DEFS.forEach((kpi) => {
-    let cumActual = 0, cumTarget = 0;
+    let cumActual = 0;
+    let cumTarget = 0;
     const cumRates = kpiWeekly.map((w) => {
       cumActual += w[kpi.key].actual;
       cumTarget += kpi.target;
@@ -551,12 +597,14 @@ function buildKpiChart(weeklyData) {
     });
     const localMax = cumRates.reduce((m, v) => (v !== null && v > m ? v : m), 0);
     if (localMax > maxCumRateValue) maxCumRateValue = localMax;
+
+    const lineColor = kpi.lineColor || kpi.color;
     datasets.push({
       type: "line",
       label: `${kpi.label} 累積進捗率`,
       data: cumRates,
       yAxisID: "yRate",
-      borderColor: kpi.color,
+      borderColor: lineColor,
       backgroundColor: "transparent",
       pointRadius: 4,
       pointHoverRadius: 6,
@@ -567,7 +615,7 @@ function buildKpiChart(weeklyData) {
       datalabels: {
         display: true,
         formatter: (v) => (v !== null ? `${v}%` : ""),
-        color: kpi.color,
+        color: lineColor,
         font: { size: 9, weight: "700" },
         align: "top",
         anchor: "end",
@@ -579,7 +627,10 @@ function buildKpiChart(weeklyData) {
     });
   });
 
-  kpiChartInstance = new Chart(document.getElementById("kpiChart"), {
+  const kpiCanvas = document.getElementById("kpiChart");
+  setCanvasWidth(kpiCanvas, labels.length);
+
+  kpiChartInstance = new Chart(kpiCanvas, {
     data: { labels, datasets },
     options: {
       responsive: true,
@@ -592,7 +643,18 @@ function buildKpiChart(weeklyData) {
         },
         tooltip: {
           callbacks: {
-            label: (item) => `${item.dataset.label}: ${item.formattedValue}${item.dataset.yAxisID === "yRate" ? "%" : ""}`
+            label: (item) => {
+              if (item.dataset.yAxisID === "yRate") {
+                return `${item.dataset.label}: ${item.formattedValue}%`;
+              }
+              const target = item.dataset.target;
+              const actual = Number(item.raw || 0);
+              const rate = target > 0 ? Math.round((actual / target) * 100) : 0;
+              const diff = actual - target;
+              const sign = diff > 0 ? "+" : "";
+              const status = actual >= target ? "達成" : "未達";
+              return `${item.dataset.label}: 実績 ${actual} / 計画 ${target} (${sign}${diff}, ${rate}%, ${status})`;
+            }
           }
         }
       },
@@ -600,6 +662,7 @@ function buildKpiChart(weeklyData) {
         x: { ticks: { maxRotation: 0, autoSkip: true } },
         y: {
           beginAtZero: true,
+          grace: "18%",
           ticks: { precision: 0 },
           title: { display: true, text: "Count" }
         },
@@ -686,7 +749,10 @@ function buildCharts(weeklyData) {
   const valueSeries = weeklyData.map((w) => w.weeklyValue);
   const valueCountSeries = weeklyData.map((w) => w.valueCount);
 
-  charts.timeline = new Chart(document.getElementById("timelineChart"), {
+  const timelineCanvas = document.getElementById("timelineChart");
+  setCanvasWidth(timelineCanvas, labels.length);
+
+  charts.timeline = new Chart(timelineCanvas, {
     data: {
       labels,
       datasets: [
@@ -901,7 +967,6 @@ function buildCharts(weeklyData) {
   });
 
   // Click bar → open modal with all deals
-  const timelineCanvas = document.getElementById("timelineChart");
   timelineCanvas.onclick = (evt) => {
     const chart = charts.timeline;
     if (!chart) return;
@@ -960,7 +1025,10 @@ function buildProjectChart(weekColumns, projectName) {
     });
   });
 
-  projectChartInstance = new Chart(document.getElementById("projectChart"), {
+  const projectCanvas = document.getElementById("projectChart");
+  setCanvasWidth(projectCanvas, labels.length);
+
+  projectChartInstance = new Chart(projectCanvas, {
     type: "bar",
     data: { labels, datasets },
     options: {
@@ -1112,43 +1180,79 @@ function parseCsvText(text) {
     header: true,
     skipEmptyLines: "greedy",
     complete: (result) => {
-      processRows(result.data || []);
+      try {
+        processRows(result.data || []);
+      } catch (err) {
+        console.error("Error processing CSV rows:", err);
+        statusText.textContent = "Error processing data: " + err.message;
+      }
     },
-    error: () => {
+    error: (err) => {
+      console.error("CSV parse error:", err);
       statusText.textContent = "Failed to parse CSV. Please check the file format.";
     }
   });
 }
 
-csvInput.addEventListener("change", (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    const text = event.target?.result;
-    if (typeof text === "string") parseCsvText(text);
-  };
-  reader.readAsText(file);
-});
+function setupCSVEventListeners() {
+  if (!csvInput || !reloadBtn) return;
+  
+  csvInput.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result;
+      if (typeof text === "string") parseCsvText(text);
+    };
+    reader.readAsText(file);
+  });
 
-reloadBtn.addEventListener("click", () => {
-  csvInput.value = "";
-  destroyCharts();
-  document.getElementById("kpiGrid").hidden = true;
-  document.querySelector(".timeline-panel").hidden = true;
-  document.getElementById("legendFooter").hidden = true;
-  document.querySelector(".project-panel").hidden = true;
-  document.getElementById("kpiTrackerPanel").hidden = true;
-  statusText.textContent = "Awaiting CSV file...";
-});
+  reloadBtn.addEventListener("click", () => {
+    csvInput.value = "";
+    destroyCharts();
+    document.getElementById("kpiGrid").hidden = true;
+    document.querySelector(".timeline-panel").hidden = true;
+    document.getElementById("legendFooter").hidden = true;
+    document.querySelector(".project-panel").hidden = true;
+    document.getElementById("kpiTrackerPanel").hidden = true;
+    statusText.textContent = "Awaiting CSV file...";
+  });
+}
 
-window.addEventListener("load", () => {
-  statusText.textContent = "Awaiting CSV file...";
-});
+document.addEventListener("DOMContentLoaded", initializeApp);
+window.addEventListener("load", initializeApp);
 
-setupModalSorting();
-
-document.getElementById("modalClose").addEventListener("click", closeModal);
-document.getElementById("dealModal").addEventListener("click", (e) => {
-  if (e.target.id === "dealModal") closeModal();
-});
+function initializeApp() {
+  // Only run once
+  if (window._appInitialized) return;
+  window._appInitialized = true;
+  
+  initializeDOMElements();
+  setupCSVEventListeners();
+  
+  if (statusText) {
+    statusText.textContent = "Awaiting CSV file...";
+  }
+  
+  try {
+    setupModalSorting();
+  } catch (err) {
+    console.error("Error in setupModalSorting:", err);
+  }
+  
+  try {
+    const modalClose = document.getElementById("modalClose");
+    const dealModal = document.getElementById("dealModal");
+    if (modalClose) {
+      modalClose.addEventListener("click", closeModal);
+    }
+    if (dealModal) {
+      dealModal.addEventListener("click", (e) => {
+        if (e.target.id === "dealModal") closeModal();
+      });
+    }
+  } catch (err) {
+    console.error("Error setting up modal listeners:", err);
+  }
+}

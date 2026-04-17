@@ -147,11 +147,13 @@ body {
 
 .dashboard {
   width: min(1200px, 92vw);
+  max-width: 1200px;
   margin: 24px auto 48px;
   display: grid;
   gap: 18px;
   position: relative;
   z-index: 2;
+  overflow-x: hidden;
 }
 
 .hero {
@@ -226,7 +228,8 @@ body {
   box-shadow: var(--shadow);
   padding: 16px;
   animation: rise 0.7s ease;
-  overflow: visible;
+  overflow: hidden;
+  width: 100%;
 }
 
 .timeline-panel {
@@ -253,6 +256,15 @@ body {
   position: relative;
   width: 100%;
   height: clamp(300px, 52vh, 540px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.chart-wrap canvas {
+  display: block;
+  height: 100% !important;
 }
 
 #projectChartWrap {
@@ -309,6 +321,7 @@ canvas {
 
 .kpi-chart-wrap {
   height: clamp(200px, 32vh, 320px) !important;
+  max-width: 100%;
 }
 
 .kpi-tracker-summary {
