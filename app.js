@@ -690,7 +690,7 @@ window.addEventListener("load", () => {
   statusText.textContent = "Awaiting CSV file...";
 });
 
-document.getElementById("closeModal").addEventListener("click", closeModal);
+document.getElementById("modalClose").addEventListener("click", closeModal);
 document.getElementById("dealModal").addEventListener("click", (e) => {
   if (e.target.id === "dealModal") closeModal();
 });
