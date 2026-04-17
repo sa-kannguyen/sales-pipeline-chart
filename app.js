@@ -32,6 +32,8 @@ const charts = {
   timeline: null
 };
 
+let projectTracking = {};
+let projectChartInstance = null;
 let dealMapping = {};
 
 const kpiGrid = document.getElementById("kpiGrid");
@@ -258,6 +260,10 @@ function destroyCharts() {
   Object.values(charts).forEach((chart) => {
     if (chart) chart.destroy();
   });
+  if (projectChartInstance) {
+    projectChartInstance.destroy();
+    projectChartInstance = null;
+  }
 }
 
 Chart.register(ChartDataLabels);
@@ -268,7 +274,7 @@ function buildCharts(weeklyData) {
   const labels = weeklyData.map((w) => w.week);
   const totals = weeklyData.map((w) => w.totalTagged);
   const scoreSeries = weeklyData.map((w) => Number(w.avgScore.toFixed(2)));
-  const valueSeries = weeklyData.map((w) => w.weeklyValue);  // null if no known values
+  const valueSeries = weeklyData.map((w) => w.weeklyValue);
   const valueCountSeries = weeklyData.map((w) => w.valueCount);
 
   charts.timeline = new Chart(document.getElementById("timelineChart"), {
@@ -382,7 +388,7 @@ function buildCharts(weeklyData) {
               
               if (!deals.length) return "";
               
-              let result = "\n" + "─".repeat(35) + "\nDeals:";;
+              let result = "\n" + "─".repeat(35) + "\nDeals:";
               deals.forEach((deal, idx) => {
                 if (idx < 5) {
                   result += `\n\n[${idx + 1}] No: ${deal.no}`;
@@ -457,7 +463,7 @@ function buildCharts(weeklyData) {
     const points = chart.getElementsAtEventForMode(evt, "nearest", { intersect: true }, false);
     if (!points.length) return;
     const { datasetIndex, index } = points[0];
-    if (datasetIndex >= STATUS_DEFS.length) return; // skip score & value lines
+    if (datasetIndex >= STATUS_DEFS.length) return;
     const status = STATUS_DEFS[datasetIndex];
     const week = labels[index];
     const key = `${week}|${status.code}`;
@@ -465,6 +471,107 @@ function buildCharts(weeklyData) {
     if (!deals.length) return;
     openDealModal(week, status, deals);
   });
+}
+
+function buildProjectChart(weekColumns, projectName) {
+  if (projectChartInstance) projectChartInstance.destroy();
+
+  const statusHistory = projectTracking[projectName];
+  if (!statusHistory || !statusHistory.length) return;
+
+  const labels = weekColumns.map((w) => cleanText(w));
+  const datasets = [];
+  const statusCounts = {};
+
+  statusHistory.forEach((statuses) => {
+    statuses.forEach((status, weekIdx) => {
+      if (status) {
+        const key = `${weekIdx}|${status}`;
+        statusCounts[key] = (statusCounts[key] || 0) + 1;
+      }
+    });
+  });
+
+  STATUS_DEFS.forEach((statusDef) => {
+    const data = [];
+    for (let i = 0; i < weekColumns.length; i++) {
+      const key = `${i}|${statusDef.code}`;
+      data.push(statusCounts[key] || 0);
+    }
+    datasets.push({
+      label: `${statusDef.code} - ${statusDef.label}`,
+      data,
+      backgroundColor: statusDef.color,
+      borderRadius: 4,
+      borderWidth: 0,
+      stack: "status"
+    });
+  });
+
+  projectChartInstance = new Chart(document.getElementById("projectChart"), {
+    type: "bar",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom" },
+        title: {
+          display: true,
+          text: `Project: ${projectName}`
+        },
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              const status = STATUS_DEFS[item.datasetIndex];
+              return `${status.code} - ${status.label}: ${item.formattedValue}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          ticks: { maxRotation: 0, autoSkip: true }
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          title: { display: true, text: "Count" }
+        }
+      }
+    }
+  });
+
+  document.getElementById("projectChartWrap").hidden = false;
+  document.getElementById("projectHint").hidden = true;
+}
+
+function openDealModal(week, status, deals) {
+  const modal = document.getElementById("dealModal");
+  const tbody = document.getElementById("modalTableBody");
+  
+  tbody.innerHTML = deals
+    .map(
+      (deal) => `
+        <tr>
+          <td>${deal.no}</td>
+          <td>${deal.client}</td>
+          <td>${deal.project}</td>
+          <td>${deal.contract}</td>
+        </tr>
+      `
+    )
+    .join("");
+
+  const title = document.getElementById("modalTitle");
+  title.textContent = `${week} • ${status.code} - ${status.label} (${deals.length} deals)`;
+  modal.hidden = false;
+}
+
+function closeModal() {
+  document.getElementById("dealModal").hidden = true;
 }
 
 function processRows(rows) {
@@ -495,6 +602,20 @@ function processRows(rows) {
     })
   );
 
+  // Build project tracking history
+  projectTracking = {};
+  usefulRows.forEach((row) => {
+    const projectName = cleanText(row[headerMap.project]) || "Unknown";
+    if (!projectTracking[projectName]) {
+      projectTracking[projectName] = [];
+    }
+    const statuses = weekColumns.map((week) => {
+      const code = normalizeStatus(row[week]);
+      return code && STATUS_BY_CODE.has(code) ? code : null;
+    });
+    projectTracking[projectName].push(statuses);
+  });
+
   const weeklyData = aggregateByWeek(usefulRows, weekColumns, headerMap);
   const latestWeekLabel = weeklyData.length ? weeklyData[weeklyData.length - 1].week : "N/A";
 
@@ -506,6 +627,27 @@ function processRows(rows) {
   document.getElementById("kpiGrid").hidden = false;
   document.querySelector(".timeline-panel").hidden = false;
   document.querySelector(".legend-panel").hidden = false;
+  document.querySelector(".project-panel").hidden = false;
+
+  // Populate project selector
+  const projectSelect = document.getElementById("projectSelect");
+  projectSelect.innerHTML = '<option value="">-- Choose a project --</option>';
+  Object.keys(projectTracking)
+    .sort()
+    .forEach((proj) => {
+      const opt = document.createElement("option");
+      opt.value = proj;
+      opt.textContent = proj;
+      projectSelect.appendChild(opt);
+    });
+
+  projectSelect.addEventListener("change", (e) => {
+    if (e.target.value) buildProjectChart(weekColumns, e.target.value);
+    else {
+      document.getElementById("projectChartWrap").hidden = true;
+      document.getElementById("projectHint").hidden = false;
+    }
+  });
 
   statusText.textContent = `Loaded ${usefulRows.length} opportunities from ${weekColumns.length} weeks.`;
 }
@@ -523,87 +665,32 @@ function parseCsvText(text) {
   });
 }
 
-function loadFromCsvFile() {
-  statusText.textContent = "Loading data.csv...";
-
-  Papa.parse("data.csv", {
-    download: true,
-    header: true,
-    skipEmptyLines: "greedy",
-    complete: (result) => {
-      if (result.errors?.length) {
-        statusText.textContent =
-          "Cannot read data.csv directly (you may be opening via file://). Please upload the file below.";
-        return;
-      }
-
-      processRows(result.data || []);
-    },
-    error: () => {
-      statusText.textContent =
-        "Cannot read data.csv directly. Please upload the CSV file using the file picker below.";
-    }
-  });
-}
-
-csvInput.addEventListener("change", (event) => {
-  const file = event.target.files?.[0];
+csvInput.addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
   if (!file) return;
-
-  statusText.textContent = `Parsing file: ${file.name}`;
   const reader = new FileReader();
-  reader.onload = () => parseCsvText(reader.result);
-  reader.onerror = () => {
-    statusText.textContent = "Failed to read the selected file.";
+  reader.onload = (event) => {
+    const text = event.target?.result;
+    if (typeof text === "string") parseCsvText(text);
   };
-  reader.readAsText(file, "utf-8");
+  reader.readAsText(file);
 });
 
-reloadBtn.addEventListener("click", loadFromCsvFile);
-
-// Modal logic
-const dealModal = document.getElementById("dealModal");
-const modalClose = document.getElementById("modalClose");
-const modalTitle = document.getElementById("modalTitle");
-const modalWeek = document.getElementById("modalWeek");
-const modalTableBody = document.getElementById("modalTableBody");
-const modalCount = document.getElementById("modalCount");
-
-function openDealModal(week, status, deals) {
-  modalWeek.textContent = `Week: ${week}`;
-  modalTitle.textContent = `${status.code} - ${status.label} · ${deals.length} deal${deals.length > 1 ? "s" : ""}`;
-  modalTitle.style.color = status.color;
-  modalCount.textContent = `${deals.length} opportunit${deals.length !== 1 ? "ies" : "y"} in this status`;
-
-  modalTableBody.innerHTML = deals
-    .map(
-      (deal, i) => `
-        <tr>
-          <td>${i + 1}</td>
-          <td class="td-no">${deal.no}</td>
-          <td>${deal.client}</td>
-          <td>${deal.project}</td>
-          <td class="td-contract">${deal.contract !== "N/A" ? deal.contract : "—"}</td>
-        </tr>
-      `
-    )
-    .join("");
-
-  dealModal.hidden = false;
-  document.body.style.overflow = "hidden";
-}
-
-function closeDealModal() {
-  dealModal.hidden = true;
-  document.body.style.overflow = "";
-}
-
-modalClose.addEventListener("click", closeDealModal);
-dealModal.addEventListener("click", (e) => {
-  if (e.target === dealModal) closeDealModal();
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !dealModal.hidden) closeDealModal();
+reloadBtn.addEventListener("click", () => {
+  csvInput.value = "";
+  destroyCharts();
+  document.getElementById("kpiGrid").hidden = true;
+  document.querySelector(".timeline-panel").hidden = true;
+  document.querySelector(".legend-panel").hidden = true;
+  document.querySelector(".project-panel").hidden = true;
+  statusText.textContent = "Awaiting CSV file...";
 });
 
-loadFromCsvFile();
+window.addEventListener("load", () => {
+  statusText.textContent = "Awaiting CSV file...";
+});
+
+document.getElementById("closeModal").addEventListener("click", closeModal);
+document.getElementById("dealModal").addEventListener("click", (e) => {
+  if (e.target.id === "dealModal") closeModal();
+});
