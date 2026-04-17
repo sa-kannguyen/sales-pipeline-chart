@@ -276,6 +276,7 @@ canvas {
 }
 
 .legend-footer {
+  display: none !important;
   position: fixed;
   bottom: 0;
   left: 0;
@@ -285,6 +286,13 @@ canvas {
   border-top: 1px solid rgba(20, 30, 40, 0.1);
   padding: 6px 24px;
   z-index: 200;
+}
+
+.chart-status-legend {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(20, 30, 40, 0.14);
+  justify-content: flex-start;
 }
 
 .legend-grid {

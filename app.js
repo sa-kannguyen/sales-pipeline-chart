@@ -454,7 +454,7 @@ function buildKpis(rows, weeklyData, latestWeekLabel, weekColumns) {
 
   return [
     {
-      title: "Total Opportunities",
+      title: "Total Projects",
       value: String(withAnyStatus),
       note: "Has at least 1 status in the weekly series"
     },
@@ -471,7 +471,7 @@ function buildKpis(rows, weeklyData, latestWeekLabel, weekColumns) {
     {
       title: "Pending",
       value: String(pending),
-      note: "Opportunities currently at status 80"
+        note: "Projects currently at status 80"
     }
   ];
 }
@@ -491,7 +491,7 @@ function renderKpis(cards) {
 }
 
 function renderLegend() {
-  statusLegend.innerHTML = STATUS_DEFS.map(
+  const legendHtml = STATUS_DEFS.map(
     (s) => `
       <div class="legend-item">
         <span class="legend-dot" style="background:${s.color}"></span>
@@ -499,6 +499,14 @@ function renderLegend() {
       </div>
     `
   ).join("");
+
+  if (statusLegend) {
+    statusLegend.innerHTML = legendHtml;
+  }
+
+  document.querySelectorAll(".status-legend-inline").forEach((el) => {
+    el.innerHTML = legendHtml;
+  });
 }
 
 function destroyCharts() {
@@ -766,7 +774,7 @@ function buildCharts(weeklyData) {
         },
         {
           type: "line",
-          label: "_Total Opportunities",
+          label: "_Total Projects",
           data: totals,
           yAxisID: "y",
           borderColor: "rgba(0,0,0,0)",
@@ -846,8 +854,8 @@ function buildCharts(weeklyData) {
                   ? `💴 Pipeline Value: ${formatYen(v)} (${cnt} deals)`
                   : `💴 Pipeline Value: N/A`;
               }
-              if (item.dataset.label === "_Total Opportunities") {
-                return `👥 Total Opportunities: ${item.formattedValue}`;
+              if (item.dataset.label === "_Total Projects") {
+                return `👥 Total Projects: ${item.formattedValue}`;
               }
               const status = STATUS_DEFS[item.datasetIndex];
               return `${status.code} - ${status.label}: ${item.formattedValue} deals`;
@@ -855,7 +863,7 @@ function buildCharts(weeklyData) {
             footer: (items) => {
               if (!items.length) return "";
               const index = items[0].dataIndex;
-              return `👥 Total: ${totals[index]} opportunities`;
+              return `👥 Total: ${totals[index]} projects`;
             }
           }
         }
@@ -874,7 +882,7 @@ function buildCharts(weeklyData) {
           ticks: { precision: 0 },
           title: {
             display: true,
-            text: "Number of Opportunities"
+            text: "Number of Projects"
           }
         },
         y1: {
@@ -1097,7 +1105,7 @@ function processRows(rows) {
   // Show dashboard sections after successful load
   document.getElementById("kpiGrid").hidden = false;
   document.querySelector(".timeline-panel").hidden = false;
-  document.getElementById("legendFooter").hidden = false;
+  document.getElementById("legendFooter").hidden = true;
   document.querySelector(".project-panel").hidden = false;
   document.getElementById("kpiTrackerPanel").hidden = false;
 
@@ -1110,7 +1118,7 @@ function processRows(rows) {
   // Setup searchable dropdown
   setupSearchableDropdown();
 
-  statusText.textContent = `Loaded ${usefulRows.length} opportunities from ${weekColumns.length} weeks.`;
+    statusText.textContent = `Loaded ${usefulRows.length} projects from ${weekColumns.length} weeks.`;
 }
 
 function parseCsvText(text) {

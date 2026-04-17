@@ -22,9 +22,9 @@
     <main class="dashboard">
       <header class="hero">
         <p class="eyebrow">FY Pipeline Monitor</p>
-        <h1>Weekly Opportunity Status Tracker</h1>
+        <h1>Weekly Project Status Tracker</h1>
         <p class="subtitle">
-          Track weekly status changes across all opportunities, auto-synced from your CSV file updated each week.
+          Track weekly status changes across all projects, auto-synced from your CSV file updated each week.
         </p>
       </header>
 
@@ -34,13 +34,14 @@
         <div class="panel-head">
           <h2>Weekly Pipeline Timeline</h2>
           <p>
-            A single chart combining all pipeline data: opportunity count by status per week (stacked),
+            A single chart combining all pipeline data: project count by status per week (stacked),
             overlaid with the Average Stage Score trend line.
           </p>
         </div>
         <div class="chart-wrap">
           <canvas id="timelineChart" aria-label="Weekly pipeline timeline chart"></canvas>
         </div>
+        <div class="chart-status-legend legend-grid status-legend-inline" id="timelineStatusLegend"></div>
       </section>
 
       <section class="panel project-panel" hidden>
@@ -65,13 +66,14 @@
         <div class="chart-wrap" id="projectChartWrap" hidden>
           <canvas id="projectChart" aria-label="Project status evolution chart"></canvas>
         </div>
+        <div class="chart-status-legend legend-grid status-legend-inline" id="projectStatusLegend"></div>
         <p id="projectHint" class="status-text">Select a project from the dropdown to view its status timeline.</p>
       </section>
 
       <section class="panel kpi-tracker-panel" id="kpiTrackerPanel" hidden>
         <div class="panel-head">
           <h2>Sales KPI Tracker</h2>
-          <p>Weekly merged KPI status (アポ獲得数 / 顧客訪問数 / 案件獲得件数). Green means all targets passed, red means at least one target missed.</p>
+          <p>Weekly merged KPI status using hardcoded targets: アポ獲得数 >= 2, 顧客訪問数 >= 3, 案件獲得件数 >= 1 per week. Green means all three targets are passed, red means at least one target is missed.</p>
         </div>
         <div class="kpi-tracker-summary" id="kpiTrackerSummary"></div>
         <div class="chart-wrap kpi-chart-wrap">
