@@ -502,6 +502,11 @@ function processRows(rows) {
   renderLegend();
   buildCharts(weeklyData);
 
+  // Show dashboard sections after successful load
+  document.getElementById("kpiGrid").hidden = false;
+  document.querySelector(".timeline-panel").hidden = false;
+  document.querySelector(".legend-panel").hidden = false;
+
   statusText.textContent = `Loaded ${usefulRows.length} opportunities from ${weekColumns.length} weeks.`;
 }
 
