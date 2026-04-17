@@ -34,7 +34,75 @@ const charts = {
 
 let projectTracking = {};
 let projectChartInstance = null;
-let dealMapping = {};
+let allProjects = [];
+let currentWeekColumns = [];
+
+function setupSearchableDropdown() {
+  const selected = document.getElementById("dropdownSelected");
+  const menu = document.getElementById("dropdownMenu");
+  const search = document.getElementById("dropdownSearch");
+  const options = document.getElementById("dropdownOptions");
+
+  if (!selected || !menu || !search || !options) return;
+
+  // Populate dropdown options
+  options.innerHTML = allProjects
+    .map(
+      (proj) => `
+    <div class="dropdown-option" data-project="${proj}">
+      ${proj}
+    </div>
+  `
+    )
+    .join("");
+
+  // Toggle menu on selected click
+  selected.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.classList.toggle("open");
+    if (menu.classList.contains("open")) {
+      search.focus();
+      search.value = "";
+      updateVisibleOptions();
+    }
+  });
+
+  // Filter options on search input
+  search.addEventListener("input", () => {
+    updateVisibleOptions();
+  });
+
+  // Handle option click
+  options.addEventListener("click", (e) => {
+    const optionEl = e.target.closest(".dropdown-option");
+    if (optionEl && !optionEl.classList.contains("hidden")) {
+      const projectName = optionEl.dataset.project;
+      selectProject(projectName);
+    }
+  });
+
+  // Close menu on click outside
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".searchable-dropdown")) {
+      menu.classList.remove("open");
+    }
+  });
+
+  function updateVisibleOptions() {
+    const query = search.value.toLowerCase().trim();
+    document.querySelectorAll(".dropdown-option").forEach((opt) => {
+      const projectName = opt.dataset.project;
+      const shouldShow = projectName.toLowerCase().includes(query);
+      opt.classList.toggle("hidden", !shouldShow);
+    });
+  }
+
+  function selectProject(projectName) {
+    selected.textContent = projectName;
+    menu.classList.remove("open");
+    buildProjectChart(currentWeekColumns, projectName);
+  }
+}
 
 const kpiGrid = document.getElementById("kpiGrid");
 const statusLegend = document.getElementById("statusLegend");
@@ -629,25 +697,14 @@ function processRows(rows) {
   document.querySelector(".legend-panel").hidden = false;
   document.querySelector(".project-panel").hidden = false;
 
-  // Populate project selector
-  const projectSelect = document.getElementById("projectSelect");
-  projectSelect.innerHTML = '<option value="">-- Choose a project --</option>';
-  Object.keys(projectTracking)
-    .sort()
-    .forEach((proj) => {
-      const opt = document.createElement("option");
-      opt.value = proj;
-      opt.textContent = proj;
-      projectSelect.appendChild(opt);
-    });
+  // Store weekColumns globally for chart building
+  currentWeekColumns = weekColumns;
 
-  projectSelect.addEventListener("change", (e) => {
-    if (e.target.value) buildProjectChart(weekColumns, e.target.value);
-    else {
-      document.getElementById("projectChartWrap").hidden = true;
-      document.getElementById("projectHint").hidden = false;
-    }
-  });
+  // Populate project dropdown with searchable options
+  allProjects = Object.keys(projectTracking).sort();
+  
+  // Setup searchable dropdown
+  setupSearchableDropdown();
 
   statusText.textContent = `Loaded ${usefulRows.length} opportunities from ${weekColumns.length} weeks.`;
 }

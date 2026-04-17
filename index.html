@@ -49,27 +49,18 @@
           <p>Track how individual project status changes across weeks.</p>
         </div>
         <div class="project-controls">
-          <label for="projectSelect">Select Project:</label>
-          <select id="projectSelect">
-            <option value="">-- Choose a project --</option>
-          </select>
-        </div>
-        <div class="chart-wrap" id="projectChartWrap" hidden>
-          <canvas id="projectChart" aria-label="Project status evolution chart"></canvas>
-        </div>
-        <p id="projectHint" class="status-text">Select a project from the dropdown to view its status timeline.</p>
-      </section>
-
-      <section class="panel project-panel" hidden>
-        <div class="panel-head">
-          <h2>Project Status Evolution</h2>
-          <p>Track how individual project status changes across weeks.</p>
-        </div>
-        <div class="project-controls">
-          <label for="projectSelect">Select Project:</label>
-          <select id="projectSelect">
-            <option value="">-- Choose a project --</option>
-          </select>
+          <div class="searchable-dropdown">
+            <div class="dropdown-selected" id="dropdownSelected">-- Choose a project --</div>
+            <div class="dropdown-menu" id="dropdownMenu">
+              <input
+                type="text"
+                class="dropdown-search"
+                id="dropdownSearch"
+                placeholder="Search..."
+              />
+              <div class="dropdown-options" id="dropdownOptions"></div>
+            </div>
+          </div>
         </div>
         <div class="chart-wrap" id="projectChartWrap" hidden>
           <canvas id="projectChart" aria-label="Project status evolution chart"></canvas>

@@ -8,29 +8,89 @@
   gap: 12px;
   margin: 0 0 16px;
   flex-wrap: wrap;
+  overflow: visible;
+  z-index: 10;
 }
 
-.project-controls label {
-  font-weight: 600;
-  color: var(--text);
-  font-size: 0.9rem;
+.searchable-dropdown {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  z-index: 100;
 }
 
-.project-controls select {
+.dropdown-selected {
   border: 1px solid rgba(20, 30, 40, 0.2);
   border-radius: 10px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: #fff;
-  font-size: 0.9rem;
   cursor: pointer;
-  min-width: 240px;
+  min-height: 20px;
+  user-select: none;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.dropdown-selected:hover {
+  background-color: #f5f5f5;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: auto;
+  background: white;
+  border: 1px solid rgba(20, 30, 40, 0.2);
+  border-radius: 10px;
+  margin-top: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 99999;
+  max-height: 300px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.dropdown-menu.open {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-search {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(20, 30, 40, 0.1);
+  font-size: 0.9rem;
+  border: none;
+  outline: none;
+  flex-shrink: 0;
   color: var(--text);
 }
 
-.project-controls select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(0, 109, 119, 0.12);
+.dropdown-search:focus {
+  background-color: #f9f9f9;
+}
+
+.dropdown-options {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 240px;
+}
+
+.dropdown-option {
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-bottom: 1px solid rgba(20, 30, 40, 0.08);
+  color: var(--text);
+}
+
+.dropdown-option:hover {
+  background-color: #f0f0f0;
+}
+
+.dropdown-option.hidden {
+  display: none;
 }
 
 :root {
@@ -165,10 +225,16 @@ body {
   box-shadow: var(--shadow);
   padding: 16px;
   animation: rise 0.7s ease;
+  overflow: visible;
 }
 
 .timeline-panel {
   overflow: hidden;
+}
+
+.project-panel {
+  overflow: visible !important;
+  z-index: 50;
 }
 
 .panel-head h2 {
