@@ -68,12 +68,18 @@
         <p id="projectHint" class="status-text">Select a project from the dropdown to view its status timeline.</p>
       </section>
 
-      <section class="panel legend-panel" hidden>
+      <section class="panel kpi-tracker-panel" id="kpiTrackerPanel" hidden>
         <div class="panel-head">
-          <h2>Status Legend</h2>
-          <p>Status code mapping used in this dashboard.</p>
+          <h2>Sales KPI Tracker</h2>
+          <p>Weekly actual vs. target for the 3 core KPI metrics. Target: 2 アポ獲得 / 3 顧客訪問 / 4 案件獲得 per week.</p>
         </div>
-        <div id="statusLegend" class="legend-grid"></div>
+        <div class="kpi-tracker-summary" id="kpiTrackerSummary"></div>
+        <div class="chart-wrap kpi-chart-wrap">
+          <canvas id="kpiChart" aria-label="Sales KPI tracker chart"></canvas>
+        </div>
+        <div class="kpi-progress-table-wrap">
+          <table class="kpi-progress-table" id="kpiProgressTable"></table>
+        </div>
       </section>
 
       <section class="panel file-panel">
@@ -92,13 +98,17 @@
       </section>
     </main>
 
+    <footer class="legend-footer" id="legendFooter" hidden>
+      <div id="statusLegend" class="legend-grid"></div>
+    </footer>
+
     <!-- Deal Modal -->
     <div id="dealModal" class="modal-backdrop" hidden>
       <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-header">
           <div>
-            <p class="modal-eyebrow" id="modalWeek"></p>
             <h2 id="modalTitle"></h2>
+            <p class="modal-eyebrow" id="modalWeek"></p>
           </div>
           <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
         </div>
@@ -106,11 +116,11 @@
           <table class="deal-table">
             <thead>
               <tr>
-                <th>#</th>
-                <th>No.</th>
-                <th>Client</th>
-                <th>Project Name</th>
-                <th>Total Contract</th>
+                <th class="sortable" data-sort="no">No.</th>
+                <th class="sortable" data-sort="client">Client</th>
+                <th class="sortable" data-sort="project">Project Name</th>
+                <th class="sortable" data-sort="status">Status</th>
+                <th class="sortable" data-sort="contract">Total Contract</th>
               </tr>
             </thead>
             <tbody id="modalTableBody"></tbody>
@@ -123,5 +133,6 @@
     </div>
 
     <script src="app.js"></script>
+    <div id="legendTooltip" class="legend-tooltip"></div>
   </body>
 </html>

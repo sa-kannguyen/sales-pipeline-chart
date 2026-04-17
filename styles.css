@@ -118,6 +118,7 @@ body {
     radial-gradient(circle at 100% 0%, #b9f2e4 0%, transparent 32%),
     linear-gradient(140deg, #f6f2e9 0%, #ece7db 100%);
   position: relative;
+  padding-bottom: 48px;
 }
 
 .bg-shape {
@@ -254,36 +255,171 @@ body {
   height: clamp(300px, 52vh, 540px);
 }
 
+#projectChartWrap {
+  height: clamp(120px, 20vh, 200px);
+}
+
 canvas {
   width: 100% !important;
   height: 100% !important;
 }
 
+.legend-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(20, 30, 40, 0.1);
+  padding: 6px 24px;
+  z-index: 200;
+}
+
 .legend-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: center;
+  justify-content: center;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(28, 34, 52, 0.09);
+  gap: 6px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  border: none;
 }
 
 .legend-dot {
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
+  flex-shrink: 0;
 }
 
 .legend-text {
-  font-size: 0.88rem;
+  font-size: 0.78rem;
   overflow-wrap: anywhere;
+  white-space: nowrap;
+}
+
+.kpi-chart-wrap {
+  height: clamp(200px, 32vh, 320px) !important;
+}
+
+.kpi-tracker-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.kpi-summary-card {
+  flex: 1;
+  min-width: 160px;
+  border-radius: 14px;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(28, 34, 52, 0.09);
+}
+
+.kpi-summary-card .kpi-name {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.kpi-summary-card .kpi-values {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.kpi-summary-card .kpi-values span {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.kpi-summary-card .kpi-rate {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.kpi-rate.good { color: #2a9d8f; }
+.kpi-rate.warn { color: #fb8500; }
+.kpi-rate.bad  { color: #e63946; }
+
+.kpi-progress-table-wrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.kpi-progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.kpi-progress-table th,
+.kpi-progress-table td {
+  padding: 8px 12px;
+  text-align: center;
+  border-bottom: 1px solid rgba(28,34,52,0.08);
+}
+
+.kpi-progress-table thead th {
+  background: #f8f9fa;
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+}
+
+.kpi-progress-table thead th:first-child,
+.kpi-progress-table tbody td:first-child {
+  text-align: left;
+  font-weight: 600;
+}
+
+.kpi-progress-table .rate-good { color: #2a9d8f; font-weight: 700; }
+.kpi-progress-table .rate-warn { color: #fb8500; font-weight: 700; }
+.kpi-progress-table .rate-bad  { color: #e63946; font-weight: 700; }
+
+.kpi-progress-table .section-header td {
+  background: rgba(28,34,52,0.04);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-align: left;
+  color: var(--text);
+  padding-top: 12px;
+}
+
+.legend-tooltip {
+  display: none;
+  position: fixed;
+  background: rgba(20, 30, 40, 0.93);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  max-width: 300px;
+  white-space: pre-line;
+  z-index: 99999;
+  pointer-events: none;
+  line-height: 1.6;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
 }
 
 .file-row {
@@ -419,6 +555,25 @@ canvas {
   border-bottom: 2px solid #e5e7eb;
 }
 
+.deal-table thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.deal-table thead th.sortable:hover {
+  color: var(--text);
+}
+
+.deal-table thead th.sorted-asc::after {
+  content: " ↑";
+  color: var(--accent);
+}
+
+.deal-table thead th.sorted-desc::after {
+  content: " ↓";
+  color: var(--accent);
+}
+
 .deal-table tbody tr {
   border-bottom: 1px solid #f0f0f0;
   transition: background 0.12s;
@@ -451,6 +606,17 @@ canvas {
   font-variant-numeric: tabular-nums;
   color: var(--accent);
   font-weight: 600;
+}
+
+.status-tag {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .modal-footer {

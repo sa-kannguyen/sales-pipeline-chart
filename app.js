@@ -1,7 +1,7 @@
 const STATUS_DEFS = [
   { code: "00", label: "SQL", color: "#8d99ae", score: 0 },
   { code: "01", label: "アポ獲得", color: "#3a86ff", score: 1 },
-  { code: "02", label: "初回訪問完了", color: "#4361ee", score: 2 },
+  { code: "02", label: "初回訪問完了", color: "#06d6a0", score: 2 },
   { code: "03", label: "商談中", color: "#8338ec", score: 3 },
   { code: "04", label: "見積提示", color: "#ff006e", score: 4 },
   { code: "5", label: "口頭内示", color: "#fb5607", score: 5 },
@@ -36,6 +36,137 @@ let projectTracking = {};
 let projectChartInstance = null;
 let allProjects = [];
 let currentWeekColumns = [];
+let modalDeals = [];
+let modalSort = { key: "no", direction: "asc" };
+
+function compareMaybeNumeric(a, b) {
+  const numA = Number(a);
+  const numB = Number(b);
+  const aIsNum = Number.isFinite(numA);
+  const bIsNum = Number.isFinite(numB);
+
+  if (aIsNum && bIsNum) return numA - numB;
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+}
+
+function getReadableTextColor(hexColor) {
+  const hex = String(hexColor || "").replace("#", "").trim();
+  if (hex.length !== 6) return "#ffffff";
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.62 ? "#1f2937" : "#ffffff";
+}
+
+function hexToRgba(hex, alpha) {
+  const clean = String(hex || "").replace("#", "").trim();
+  if (clean.length !== 6) return `rgba(148, 163, 184, ${alpha})`;
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function buildStatusBreakdown(deals) {
+  const counts = Object.fromEntries(STATUS_DEFS.map((s) => [s.code, 0]));
+  deals.forEach((deal) => {
+    if (counts[deal.statusCode] !== undefined) counts[deal.statusCode] += 1;
+  });
+
+  return STATUS_DEFS
+    .filter((s) => counts[s.code] > 0)
+    .map((s) => `${s.code}-${s.label}: ${counts[s.code]}`)
+    .join(" | ");
+}
+
+function sortModalDeals(deals, sortKey, direction) {
+  const sorted = [...deals].sort((a, b) => {
+    if (sortKey === "contract") {
+      const aValue = parseContractValue(a.contract);
+      const bValue = parseContractValue(b.contract);
+      if (aValue === null && bValue === null) return 0;
+      if (aValue === null) return 1;
+      if (bValue === null) return -1;
+      return aValue - bValue;
+    }
+
+    if (sortKey === "status") {
+      return (a.statusScore ?? -99) - (b.statusScore ?? -99);
+    }
+
+    return compareMaybeNumeric(a[sortKey] ?? "", b[sortKey] ?? "");
+  });
+
+  if (direction === "desc") sorted.reverse();
+  return sorted;
+}
+
+function updateModalSortHeader() {
+  const headers = document.querySelectorAll(".deal-table thead th.sortable");
+  headers.forEach((th) => {
+    th.classList.remove("sorted-asc", "sorted-desc");
+    if (th.dataset.sort === modalSort.key) {
+      th.classList.add(modalSort.direction === "asc" ? "sorted-asc" : "sorted-desc");
+    }
+  });
+}
+
+function renderModalDeals() {
+  const tbody = document.getElementById("modalTableBody");
+  const modalCount = document.getElementById("modalCount");
+  if (!tbody) return;
+
+  const sortedDeals = sortModalDeals(modalDeals, modalSort.key, modalSort.direction);
+  tbody.innerHTML = sortedDeals
+    .map(
+      (deal) => {
+        const statusDef = STATUS_BY_CODE.get(deal.statusCode);
+        const statusColor = statusDef?.color || "#94a3b8";
+        const statusBg = hexToRgba(statusColor, 0.14);
+        const statusBorder = hexToRgba(statusColor, 0.4);
+        return `
+        <tr>
+          <td class="td-no">${deal.no}</td>
+          <td>${deal.client}</td>
+          <td>${deal.project}</td>
+          <td>
+            <span class="status-tag" style="background:${statusBg};border-color:${statusBorder};color:${statusColor};">
+              ${deal.statusCode} - ${deal.statusLabel}
+            </span>
+          </td>
+          <td class="td-contract">${deal.contract}</td>
+        </tr>
+      `;
+      }
+    )
+    .join("");
+
+  if (modalCount) {
+    modalCount.textContent = `${sortedDeals.length} deals • Sorted by ${modalSort.key} (${modalSort.direction})`;
+  }
+
+  updateModalSortHeader();
+}
+
+function setupModalSorting() {
+  const headers = document.querySelectorAll(".deal-table thead th.sortable");
+  headers.forEach((th) => {
+    th.addEventListener("click", () => {
+      const sortKey = th.dataset.sort;
+      if (!sortKey) return;
+
+      if (modalSort.key === sortKey) {
+        modalSort.direction = modalSort.direction === "asc" ? "desc" : "asc";
+      } else {
+        modalSort.key = sortKey;
+        modalSort.direction = "asc";
+      }
+
+      renderModalDeals();
+    });
+  });
+}
 
 function setupSearchableDropdown() {
   const selected = document.getElementById("dropdownSelected");
@@ -220,7 +351,10 @@ function aggregateByWeek(rows, weekColumns, headerMap) {
         no: cleanText(row[headerMap.no]) || "N/A",
         client: cleanText(row[headerMap.client]) || "N/A",
         project: cleanText(row[headerMap.project]) || "N/A",
-        contract: contractRaw || "N/A"
+        contract: contractRaw || "N/A",
+        statusCode: code,
+        statusLabel: STATUS_BY_CODE.get(code)?.label || "Unknown",
+        statusScore: STATUS_BY_CODE.get(code)?.score ?? -99
       };
       deals[code].push(dealInfo);
     });
@@ -336,6 +470,204 @@ function destroyCharts() {
 
 Chart.register(ChartDataLabels);
 
+// ─── Sales KPI Tracker ─────────────────────────────────────────────────────
+const KPI_DEFS = [
+  { key: "apo",   label: "アポ獲得数",   codes: ["01"],     target: 2, color: "#3a86ff" },
+  { key: "visit", label: "顧客訪問数",   codes: ["02"],     target: 3, color: "#06d6a0" },
+  { key: "won",   label: "案件獲得件数", codes: ["6", "7"], target: 4, color: "#2a9d8f" },
+];
+
+let kpiChartInstance = null;
+
+function calcKpiWeekly(weeklyData) {
+  return weeklyData.map((w) => {
+    const result = { week: w.week };
+    KPI_DEFS.forEach((kpi) => {
+      const actual = kpi.codes.reduce((sum, code) => sum + (w.counts[code] || 0), 0);
+      result[kpi.key] = { actual, target: kpi.target, rate: kpi.target > 0 ? actual / kpi.target : null };
+    });
+    return result;
+  });
+}
+
+function buildKpiChart(weeklyData) {
+  if (kpiChartInstance) kpiChartInstance.destroy();
+
+  const kpiWeekly = calcKpiWeekly(weeklyData);
+  const labels = kpiWeekly.map((w) => w.week);
+
+  const datasets = [];
+
+  KPI_DEFS.forEach((kpi) => {
+    // Target bar (muted)
+    datasets.push({
+      type: "bar",
+      label: `${kpi.label} 計画`,
+      data: kpiWeekly.map(() => kpi.target),
+      backgroundColor: `${kpi.color}30`,
+      borderColor: `${kpi.color}80`,
+      borderWidth: 1,
+      borderRadius: 4,
+      stack: kpi.key,
+      datalabels: { display: false }
+    });
+    // Actual bar
+    datasets.push({
+      type: "bar",
+      label: `${kpi.label} 実績`,
+      data: kpiWeekly.map((w) => w[kpi.key].actual),
+      backgroundColor: kpiWeekly.map((w) =>
+        w[kpi.key].actual >= kpi.target ? kpi.color : "#e63946"
+      ),
+      borderRadius: 4,
+      borderWidth: 0,
+      stack: kpi.key,
+      datalabels: {
+        display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+        formatter: (v) => v,
+        color: "#fff",
+        font: { size: 10, weight: "700" },
+        anchor: "center",
+        align: "center",
+        clip: true
+      }
+    });
+  });
+
+  // 累積進捗率 lines per KPI
+  KPI_DEFS.forEach((kpi) => {
+    let cumActual = 0, cumTarget = 0;
+    const cumRates = kpiWeekly.map((w) => {
+      cumActual += w[kpi.key].actual;
+      cumTarget += kpi.target;
+      return cumTarget > 0 ? Math.round((cumActual / cumTarget) * 100) : null;
+    });
+    datasets.push({
+      type: "line",
+      label: `${kpi.label} 累積進捗率`,
+      data: cumRates,
+      yAxisID: "yRate",
+      borderColor: kpi.color,
+      backgroundColor: "transparent",
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      borderWidth: 2,
+      borderDash: [5, 3],
+      tension: 0.3,
+      spanGaps: true,
+      datalabels: {
+        display: true,
+        formatter: (v) => (v !== null ? `${v}%` : ""),
+        color: kpi.color,
+        font: { size: 9, weight: "700" },
+        align: "top",
+        anchor: "end",
+        offset: 2,
+        backgroundColor: "rgba(255,255,255,0.85)",
+        borderRadius: 3,
+        padding: { top: 1, bottom: 1, left: 3, right: 3 }
+      }
+    });
+  });
+
+  kpiChartInstance = new Chart(document.getElementById("kpiChart"), {
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: "bottom",
+          labels: { font: { size: 11 }, padding: 12, boxWidth: 14 }
+        },
+        tooltip: {
+          callbacks: {
+            label: (item) => `${item.dataset.label}: ${item.formattedValue}${item.dataset.yAxisID === "yRate" ? "%" : ""}`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { maxRotation: 0, autoSkip: true } },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          title: { display: true, text: "Count" }
+        },
+        yRate: {
+          position: "right",
+          beginAtZero: true,
+          max: 150,
+          ticks: { callback: (v) => `${v}%` },
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: "累積進捗率" }
+        }
+      }
+    }
+  });
+
+  renderKpiSummary(kpiWeekly);
+  renderKpiProgressTable(kpiWeekly);
+}
+
+function rateClass(rate) {
+  if (rate === null) return "";
+  if (rate >= 1) return "rate-good";
+  if (rate >= 0.7) return "rate-warn";
+  return "rate-bad";
+}
+
+function renderKpiSummary(kpiWeekly) {
+  const summary = document.getElementById("kpiTrackerSummary");
+  if (!summary) return;
+  summary.innerHTML = KPI_DEFS.map((kpi) => {
+    let cumActual = 0, cumTarget = 0;
+    kpiWeekly.forEach((w) => { cumActual += w[kpi.key].actual; cumTarget += kpi.target; });
+    const cumRate = cumTarget > 0 ? cumActual / cumTarget : null;
+    const pct = cumRate !== null ? Math.round(cumRate * 100) : null;
+    const cls = rateClass(cumRate);
+    return `
+      <div class="kpi-summary-card">
+        <div class="kpi-name">${kpi.label}</div>
+        <div class="kpi-values">${cumActual} <span>/ ${cumTarget} 計画</span></div>
+        <div class="kpi-rate ${cls}">${pct !== null ? `累積 ${pct}%` : "N/A"}</div>
+      </div>`;
+  }).join("");
+}
+
+function renderKpiProgressTable(kpiWeekly) {
+  const table = document.getElementById("kpiProgressTable");
+  if (!table) return;
+  const weekCols = kpiWeekly.map((w) => `<th>${w.week}</th>`).join("");
+  const rows = KPI_DEFS.map((kpi) => {
+    let cumActual = 0, cumTarget = 0;
+    const targetCells = kpiWeekly.map(() => `<td>${kpi.target}</td>`).join("");
+    const actualCells = kpiWeekly.map((w) => `<td>${w[kpi.key].actual}</td>`).join("");
+    const weekRateCells = kpiWeekly.map((w) => {
+      const r = w[kpi.key].rate;
+      const pct = r !== null ? Math.round(r * 100) : null;
+      return `<td class="${rateClass(r)}">${pct !== null ? pct + "%" : "-"}</td>`;
+    }).join("");
+    const cumRateCells = kpiWeekly.map((w) => {
+      cumActual += w[kpi.key].actual;
+      cumTarget += kpi.target;
+      const r = cumTarget > 0 ? cumActual / cumTarget : null;
+      const pct = r !== null ? Math.round(r * 100) : null;
+      return `<td class="${rateClass(r)}">${pct !== null ? pct + "%" : "-"}</td>`;
+    }).join("");
+    return `
+      <tr class="section-header"><td colspan="${kpiWeekly.length + 1}">${kpi.label}</td></tr>
+      <tr><td>計画</td>${targetCells}</tr>
+      <tr><td>実績</td>${actualCells}</tr>
+      <tr><td>週次進捗率</td>${weekRateCells}</tr>
+      <tr><td>累積進捗率</td>${cumRateCells}</tr>`;
+  }).join("");
+  table.innerHTML = `
+    <thead><tr><th>KPI</th>${weekCols}</tr></thead>
+    <tbody>${rows}</tbody>`;
+}
+// ─── End Sales KPI Tracker ──────────────────────────────────────────────────
+
 function buildCharts(weeklyData) {
   destroyCharts();
 
@@ -357,7 +689,16 @@ function buildCharts(weeklyData) {
           borderRadius: 4,
           borderWidth: 0,
           stack: "status",
-          datalabels: { display: false }
+          datalabels: {
+            display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+            formatter: (value) => `${value}`,
+            color: getReadableTextColor(status.color),
+            font: { size: 9, weight: "700" },
+            align: "center",
+            anchor: "center",
+            textAlign: "center",
+            clip: true
+          }
         })),
         {
           type: "line",
@@ -409,6 +750,27 @@ function buildCharts(weeklyData) {
             borderRadius: 4,
             padding: { top: 2, bottom: 2, left: 4, right: 4 }
           }
+        },
+        {
+          type: "line",
+          label: "_Total Opportunities",
+          data: totals,
+          yAxisID: "y",
+          borderColor: "rgba(0,0,0,0)",
+          backgroundColor: "rgba(0,0,0,0)",
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          borderWidth: 0,
+          showLine: false,
+          datalabels: {
+            display: true,
+            align: "top",
+            anchor: "end",
+            offset: -2,
+            color: "#3c4257",
+            font: { size: 12, weight: "700" },
+            formatter: (v) => v
+          }
         }
       ]
     },
@@ -416,7 +778,35 @@ function buildCharts(weeklyData) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: "bottom" },
+        legend: {
+          display: true,
+          labels: {
+            filter: (item) => item.text === "Average Stage Score" || item.text === "Pipeline Value (¥)",
+            usePointStyle: true,
+            pointStyle: "line",
+            font: { size: 12 },
+            padding: 16,
+          },
+          onHover: (event, legendItem) => {
+            const native = event.native;
+            if (!native) return;
+            const tooltipEl = document.getElementById("legendTooltip");
+            const descriptions = {
+              "Average Stage Score":
+                "📈 Average Stage Score\n\nWeighted average of stage scores across all deals in the week.\n\nFormula:\n  Σ(stage score per deal) ÷ total deals\n\nScale:  Min −1  →  Max 7\n  < 1  🔴 Early stage / low progress\n  1–3  🟡 Pipeline developing\n  3–5  🟢 Advancing well\n  > 5  ✅ Near close / strong pipeline\n\nStage scores:\n  00 SQL = 0\n  01 アポ獲得 = 1\n  02 初回訪問完了 = 2\n  03 商談中 = 3\n  04 見積提示 = 4\n  5 口頭内示 = 5\n  6 受注 = 6\n  7 請求済み = 7\n  80 ペンディング = 2.5\n  99 失注 = −1",
+              "Pipeline Value (¥)":
+                "💴 Pipeline Value (¥)\n\nTotal contract value (¥) of all deals with an entered amount in that week.",
+            };
+            tooltipEl.textContent = descriptions[legendItem.text] || legendItem.text;
+            tooltipEl.style.display = "block";
+            tooltipEl.style.left = native.clientX + 14 + "px";
+            tooltipEl.style.top = native.clientY - 10 + "px";
+          },
+          onLeave: () => {
+            const tooltipEl = document.getElementById("legendTooltip");
+            if (tooltipEl) tooltipEl.style.display = "none";
+          },
+        },
         tooltip: {
           backgroundColor: "rgba(0, 0, 0, 0.92)",
           padding: 14,
@@ -433,44 +823,21 @@ function buildCharts(weeklyData) {
               return `${labels[item.dataIndex]}`;
             },
             label: (item) => {
-              if (item.datasetIndex === STATUS_DEFS.length) {
+              if (item.dataset.label === "Average Stage Score") {
                 return `📈 Stage Score: ${item.formattedValue}`;
               }
-              if (item.datasetIndex === STATUS_DEFS.length + 1) {
+              if (item.dataset.label === "Pipeline Value (¥)") {
                 const v = valueSeries[item.dataIndex];
                 const cnt = valueCountSeries[item.dataIndex];
                 return v !== null
                   ? `💴 Pipeline Value: ${formatYen(v)} (${cnt} deals)`
                   : `💴 Pipeline Value: N/A`;
               }
+              if (item.dataset.label === "_Total Opportunities") {
+                return `👥 Total Opportunities: ${item.formattedValue}`;
+              }
               const status = STATUS_DEFS[item.datasetIndex];
               return `${status.code} - ${status.label}: ${item.formattedValue} deals`;
-            },
-            afterLabel: (item) => {
-              if (item.datasetIndex >= STATUS_DEFS.length) return "";
-              
-              const week = labels[item.dataIndex];
-              const status = STATUS_DEFS[item.datasetIndex];
-              const key = `${week}|${status.code}`;
-              const deals = dealMapping[key] || [];
-              
-              if (!deals.length) return "";
-              
-              let result = "\n" + "─".repeat(35) + "\nDeals:";
-              deals.forEach((deal, idx) => {
-                if (idx < 5) {
-                  result += `\n\n[${idx + 1}] No: ${deal.no}`;
-                  result += `\n    Client: ${deal.client}`;
-                  result += `\n    Project: ${deal.project}`;
-                  result += `\n    Value: ${deal.contract}`;
-                }
-              });
-              if (deals.length > 5) {
-                result += `\n\n... và ${deals.length - 5} deal khác`;
-                result += "\n💡 Click bar để xem tất cả";
-              }
-              result += "\n" + "─".repeat(35);
-              return result;
             },
             footer: (items) => {
               if (!items.length) return "";
@@ -525,20 +892,28 @@ function buildCharts(weeklyData) {
   });
 
   // Click bar → open modal with all deals
-  document.getElementById("timelineChart").addEventListener("click", (evt) => {
+  const timelineCanvas = document.getElementById("timelineChart");
+  timelineCanvas.onclick = (evt) => {
     const chart = charts.timeline;
     if (!chart) return;
-    const points = chart.getElementsAtEventForMode(evt, "nearest", { intersect: true }, false);
+
+    const points = chart.getElementsAtEventForMode(evt, "index", { intersect: true }, false);
     if (!points.length) return;
-    const { datasetIndex, index } = points[0];
-    if (datasetIndex >= STATUS_DEFS.length) return;
-    const status = STATUS_DEFS[datasetIndex];
+
+    const barPoint = points.find((p) => p.datasetIndex < STATUS_DEFS.length);
+    if (!barPoint) return;
+
+    const { index } = barPoint;
     const week = labels[index];
-    const key = `${week}|${status.code}`;
-    const deals = dealMapping[key] || [];
-    if (!deals.length) return;
-    openDealModal(week, status, deals);
-  });
+
+    const allDeals = STATUS_DEFS.flatMap((status) => {
+      const key = `${week}|${status.code}`;
+      return dealMapping[key] || [];
+    });
+
+    if (!allDeals.length) return;
+    openDealModal(week, { code: "ALL", label: "All Statuses" }, allDeals);
+  };
 }
 
 function buildProjectChart(weekColumns, projectName) {
@@ -583,7 +958,20 @@ function buildProjectChart(weekColumns, projectName) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: "bottom" },
+        legend: { display: false },
+        datalabels: {
+          display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+          formatter: (value, ctx) => {
+            const status = STATUS_DEFS[ctx.datasetIndex];
+            return `${status.code} ${status.label}`;
+          },
+          color: "#fff",
+          font: { size: 11, weight: "bold" },
+          anchor: "center",
+          align: "center",
+          overflow: "hidden",
+          clip: true,
+        },
         title: {
           display: true,
           text: `Project: ${projectName}`
@@ -618,23 +1006,18 @@ function buildProjectChart(weekColumns, projectName) {
 
 function openDealModal(week, status, deals) {
   const modal = document.getElementById("dealModal");
-  const tbody = document.getElementById("modalTableBody");
-  
-  tbody.innerHTML = deals
-    .map(
-      (deal) => `
-        <tr>
-          <td>${deal.no}</td>
-          <td>${deal.client}</td>
-          <td>${deal.project}</td>
-          <td>${deal.contract}</td>
-        </tr>
-      `
-    )
-    .join("");
+  const eyebrow = document.getElementById("modalWeek");
+  const breakdown = buildStatusBreakdown(deals);
+
+  modalDeals = [...deals];
+  modalSort = { key: "no", direction: "asc" };
+  renderModalDeals();
 
   const title = document.getElementById("modalTitle");
-  title.textContent = `${week} • ${status.code} - ${status.label} (${deals.length} deals)`;
+  title.textContent = status.code === "ALL"
+    ? `${week} • All Statuses (${deals.length} deals)`
+    : `${week} • ${status.code} - ${status.label} (${deals.length} deals)`;
+  if (eyebrow) eyebrow.textContent = `${deals.length} deals • ${breakdown}`;
   modal.hidden = false;
 }
 
@@ -663,12 +1046,16 @@ function processRows(rows) {
     contract: findHeaderColumn(headers, ["contract", "value", "total"]) || headers[4]
   };
 
-  const usefulRows = rows.filter((row) =>
-    weekColumns.some((week) => {
+  const firstHeader = cleanText(Object.keys(rows[0])[0]).toLowerCase();
+  const usefulRows = rows.filter((row) => {
+    // Skip rows that repeat the header (first cell matches first header key)
+    const firstCell = cleanText(Object.values(row)[0]).toLowerCase();
+    if (firstCell === firstHeader) return false;
+    return weekColumns.some((week) => {
       const code = normalizeStatus(row[week]);
       return code && STATUS_BY_CODE.has(code);
-    })
-  );
+    });
+  });
 
   // Build project tracking history
   projectTracking = {};
@@ -690,12 +1077,14 @@ function processRows(rows) {
   renderKpis(buildKpis(usefulRows, weeklyData, latestWeekLabel, weekColumns));
   renderLegend();
   buildCharts(weeklyData);
+  buildKpiChart(weeklyData);
 
   // Show dashboard sections after successful load
   document.getElementById("kpiGrid").hidden = false;
   document.querySelector(".timeline-panel").hidden = false;
-  document.querySelector(".legend-panel").hidden = false;
+  document.getElementById("legendFooter").hidden = false;
   document.querySelector(".project-panel").hidden = false;
+  document.getElementById("kpiTrackerPanel").hidden = false;
 
   // Store weekColumns globally for chart building
   currentWeekColumns = weekColumns;
@@ -738,14 +1127,17 @@ reloadBtn.addEventListener("click", () => {
   destroyCharts();
   document.getElementById("kpiGrid").hidden = true;
   document.querySelector(".timeline-panel").hidden = true;
-  document.querySelector(".legend-panel").hidden = true;
+  document.getElementById("legendFooter").hidden = true;
   document.querySelector(".project-panel").hidden = true;
+  document.getElementById("kpiTrackerPanel").hidden = true;
   statusText.textContent = "Awaiting CSV file...";
 });
 
 window.addEventListener("load", () => {
   statusText.textContent = "Awaiting CSV file...";
 });
+
+setupModalSorting();
 
 document.getElementById("modalClose").addEventListener("click", closeModal);
 document.getElementById("dealModal").addEventListener("click", (e) => {
