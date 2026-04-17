@@ -495,6 +495,7 @@ function buildKpiChart(weeklyData) {
 
   const kpiWeekly = calcKpiWeekly(weeklyData);
   const labels = kpiWeekly.map((w) => w.week);
+  let maxCumRateValue = 100;
 
   const datasets = [];
 
@@ -508,7 +509,10 @@ function buildKpiChart(weeklyData) {
       borderColor: `${kpi.color}80`,
       borderWidth: 1,
       borderRadius: 4,
-      stack: kpi.key,
+      stack: `${kpi.key}-plan`,
+      categoryPercentage: 0.72,
+      barPercentage: 0.9,
+      maxBarThickness: 18,
       datalabels: { display: false }
     });
     // Actual bar
@@ -521,7 +525,10 @@ function buildKpiChart(weeklyData) {
       ),
       borderRadius: 4,
       borderWidth: 0,
-      stack: kpi.key,
+      stack: `${kpi.key}-actual`,
+      categoryPercentage: 0.72,
+      barPercentage: 0.9,
+      maxBarThickness: 18,
       datalabels: {
         display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
         formatter: (v) => v,
@@ -542,6 +549,8 @@ function buildKpiChart(weeklyData) {
       cumTarget += kpi.target;
       return cumTarget > 0 ? Math.round((cumActual / cumTarget) * 100) : null;
     });
+    const localMax = cumRates.reduce((m, v) => (v !== null && v > m ? v : m), 0);
+    if (localMax > maxCumRateValue) maxCumRateValue = localMax;
     datasets.push({
       type: "line",
       label: `${kpi.label} 累積進捗率`,
@@ -597,7 +606,7 @@ function buildKpiChart(weeklyData) {
         yRate: {
           position: "right",
           beginAtZero: true,
-          max: 150,
+          max: Math.max(150, Math.ceil((maxCumRateValue + 10) / 10) * 10),
           ticks: { callback: (v) => `${v}%` },
           grid: { drawOnChartArea: false },
           title: { display: true, text: "累積進捗率" }
